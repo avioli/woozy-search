@@ -61,9 +61,7 @@ class Woozy<T> {
 
     _entries.forEach((entry) {
       final bestScore = entry.words.fold(0.0, (currentScore, word) {
-        final distance = _levenshtein.distance(query, word);
-        final maxLength = max(query.length, word.length);
-        final score = (maxLength - distance) / maxLength;
+        final score = _levenshtein.score(query, word);
         return max<double>(currentScore, score);
       });
 

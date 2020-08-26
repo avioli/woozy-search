@@ -62,4 +62,17 @@ class Levenshtein {
 
     return _dp[word1.length][word2.length];
   }
+
+  /// Compute a score - difference between [word1] and [word2]
+  ///
+  /// Result is between `0.0` - `1.0` (inclusive). Higher score means closer
+  /// match.
+  ///
+  /// NOTE: if both words are empty the result will be `null`.
+  double score(String word1, String word2) {
+    final maxLength = max(word1.length, word2.length);
+    if (maxLength == 0) return null;
+    final _distance = distance(word1, word2);
+    return (maxLength - _distance) / maxLength;
+  }
 }

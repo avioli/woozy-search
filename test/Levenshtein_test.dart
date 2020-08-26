@@ -38,5 +38,15 @@ void main() {
       );
       expect(levenshtein.distance('to', 'short'), 4);
     });
+
+    test('Scoring', () {
+      expect(levenshtein.score('exact', 'exact'), 1);
+      expect(levenshtein.score('', ''), null);
+      expect(levenshtein.score('right-empty', ''), 0);
+      expect(levenshtein.score('', 'left-empty'), 0);
+      expect(levenshtein.score('no', 'match'), 0);
+      expect(levenshtein.score('HONDA', 'HYUNDAI'), closeTo(0.571, 0.001));
+      expect(levenshtein.score('t', 'a-long-string'), closeTo(0.076, 0.001));
+    });
   });
 }
