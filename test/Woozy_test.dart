@@ -125,4 +125,236 @@ void main() {
       expect(records.first.text, 'Boo');
     });
   });
+
+  group('SingleScoreProcessor:', () {
+    test('ExactWord', () {
+      final woozy = Woozy(processor: SingleScoreProcessor(ExactScore()));
+      woozy.addEntries(['foo', 'boo', 'fun', 'funny']);
+      {
+        final records = woozy.search('foo');
+        expect(records.first.text, 'foo');
+        expect(records.first.score, 1.0);
+        expect(records[1].score, 0.0);
+      }
+      {
+        final records = woozy.search('BOO');
+        expect(records.first.text, 'boo');
+        expect(records.first.score, 1.0);
+        expect(records[1].score, 0.0);
+      }
+      {
+        final records = woozy.search('funny');
+        expect(records.first.text, 'funny');
+        expect(records.first.score, 1.0);
+        expect(records[1].score, 0.0);
+      }
+    });
+
+    test('StartsWithWord', () {
+      final woozy = Woozy(processor: SingleScoreProcessor(StartsWithScore()));
+      woozy.addEntries(['foo', 'boo', 'fun', 'funny']);
+      {
+        final records = woozy.search('f');
+        expect(records.map((r) => r.text).take(3), ['foo', 'fun', 'funny']);
+        expect(records[0].score, closeTo(0.333, 0.001));
+        expect(records[1].score, closeTo(0.333, 0.001));
+        expect(records[2].score, closeTo(0.2, 0.001));
+        expect(records[3].score, 0.0);
+      }
+      {
+        final records = woozy.search('fu');
+        expect(records.map((r) => r.text).take(2), ['fun', 'funny']);
+        expect(records[0].score, closeTo(0.667, 0.001));
+        expect(records[1].score, closeTo(0.400, 0.001));
+        expect(records[2].score, 0.0);
+      }
+      {
+        final records = woozy.search('B');
+        expect(records.first.text, 'boo');
+        expect(records[0].score, closeTo(0.333, 0.001));
+        expect(records[1].score, 0.0);
+      }
+    });
+
+    test('ContainsWord', () {
+      final woozy = Woozy(processor: SingleScoreProcessor(ContainsScore()));
+      woozy.addEntries(['foo', 'boo', 'fun', 'funny']);
+      {
+        final records = woozy.search('oo');
+        expect(records.map((r) => r.text).take(2), ['foo', 'boo']);
+        expect(records[0].score, closeTo(0.444, 0.001));
+        expect(records[1].score, closeTo(0.444, 0.001));
+        expect(records[2].score, 0.0);
+      }
+      {
+        final records = woozy.search('F');
+        expect(records.map((r) => r.text).take(3), ['foo', 'fun', 'funny']);
+        expect(records[0].score, closeTo(0.333, 0.001));
+        expect(records[1].score, closeTo(0.333, 0.001));
+        expect(records[2].score, closeTo(0.2, 0.001));
+        expect(records[3].score, 0.0);
+      }
+      {
+        final records = woozy.search('un');
+        expect(records.map((r) => r.text).take(2), ['fun', 'funny']);
+        expect(records[0].score, closeTo(0.444, 0.001));
+        expect(records[1].score, closeTo(0.32, 0.001));
+        expect(records[2].score, 0.0);
+      }
+      {
+        final records = woozy.search('b');
+        expect(records.first.text, 'boo');
+        expect(records[0].score, closeTo(0.333, 0.001));
+        expect(records[2].score, 0.0);
+      }
+    });
+  });
+
+  group('FirstWinsProcessor:', () {
+    Woozy woozy;
+    setUp(() {
+      final processor = FirstWinsProcessor(
+          [ExactScore(), StartsWithScore(), ContainsScore()]);
+      woozy = Woozy(processor: processor);
+      woozy.addEntries([
+        /**/ 'Et sunt sint deserunt ipsum do enim dolore consequat sunt sint adipisicing ipsum.',
+        //                                   enim        Cons                       ci
+        //                                   exact       start                      contains
+        /**/ 'Consequat enim id laborum dolor sunt ut.',
+        //    Cons      enim
+        //    start     exact
+        /**/ 'Enim id anim veniam elit duis enim id cillum aliqua irure exercitation elit magna.',
+        //    Enim                          enim    ci                      ci
+        //    exact                         exact   start                   contains
+      ]);
+    });
+    test('ExactScore', () {
+      final records = woozy.search('enim');
+      // _inspectResults('enim', records);
+      expect(records[0].text, startsWith('Enim id'));
+      expect(records[1].text, startsWith('Consequat'));
+      expect(records[2].text, startsWith('Et sunt'));
+      expect(records[0].score, 1.0);
+      expect(records[1].score, closeTo(0.978, 0.001));
+      expect(records[2].score, closeTo(0.911, 0.001));
+    });
+    test('StartsWithScore', () {
+      final records = woozy.search('Cons');
+      // _inspectResults('Cons', records);
+      expect(records[0].text, startsWith('Consequat'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Enim id'));
+      expect(records[0].score, closeTo(0.444, 0.001));
+      expect(records[1].score, closeTo(0.383, 0.001));
+      expect(records[2].score, 0.0);
+    });
+    test('ContainsScore', () {
+      final records = woozy.search('ci');
+      // _inspectResults('ci', records);
+      expect(records[0].text, startsWith('Enim id'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Consequat'));
+      expect(records[0].score, closeTo(0.293, 0.001));
+      expect(records[1].score, closeTo(0.048, 0.001));
+      expect(records[2].score, 0.0);
+    });
+  });
+
+  group('FirstWinsProcessor - averageScore:', () {
+    Woozy woozy;
+    setUp(() {
+      final processor = FirstWinsProcessor(
+          [ExactScore(), StartsWithScore(), ContainsScore()],
+          averageScore: true);
+      woozy = Woozy(processor: processor);
+      woozy.addEntries([
+        /**/ 'Et sunt sint deserunt ipsum do enim dolore consequat sunt sint adipisicing ipsum.',
+        //                                   enim        Cons                       ci
+        //                                   exact       start                      contains
+        /**/ 'Consequat enim id laborum dolor sunt ut.',
+        //    Cons      enim
+        //    start     exact
+        /**/ 'Enim id anim veniam elit duis enim id cillum aliqua irure exercitation elit magna.',
+        //    Enim                          enim    ci                      ci
+        //    exact                         exact   start                   contains
+      ]);
+    });
+    test('ExactScore', () {
+      final records = woozy.search('enim');
+      // _inspectResults('enim', records);
+      expect(records[0].text, startsWith('Consequat'));
+      expect(records[1].text, startsWith('Enim id'));
+      expect(records[2].text, startsWith('Et sunt'));
+      expect(records[0].score, closeTo(0.978, 0.001));
+      expect(records[1].score, closeTo(0.959, 0.001));
+      expect(records[2].score, closeTo(0.911, 0.001));
+    });
+    test('StartsWithScore', () {
+      // NOTE: same as the non-average, since these entries have only one match
+      final records = woozy.search('Cons');
+      // _inspectResults('Cons', records);
+      expect(records[0].text, startsWith('Consequat'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Enim id'));
+      expect(records[0].score, closeTo(0.444, 0.001));
+      expect(records[1].score, closeTo(0.383, 0.001));
+      expect(records[2].score, 0.0);
+    });
+    test('ContainsScore', () {
+      final records = woozy.search('ci');
+      // _inspectResults('ci', records);
+      expect(records[0].text, startsWith('Enim id'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Consequat'));
+      expect(records[0].score, closeTo(0.189, 0.001));
+      expect(records[1].score, closeTo(0.048, 0.001));
+      expect(records[2].score, 0.0);
+    });
+  });
+
+  group('Factories:', () {
+    final entries = [
+      /**/ 'Et sunt sint deserunt ipsum do enim dolore consequat sunt sint adipisicing ipsum.',
+      //                                                                          ci
+      /**/ 'Consequat enim id laborum dolor sunt ut.',
+      /**/ 'Enim id anim veniam elit duis enim id cillum aliqua irure exercitation elit magna.',
+      //                                          ci                      ci
+    ];
+    test('esc', () {
+      final woozy = Woozy.esc();
+      woozy.addEntries(entries);
+      final records = woozy.search('ci');
+      // _inspectResults('ci', records);
+      expect(records[0].text, startsWith('Enim id'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Consequat'));
+      expect(records[0].score, closeTo(0.293, 0.001));
+      expect(records[1].score, closeTo(0.048, 0.001));
+      expect(records[2].score, 0.0);
+    });
+    test('escFuzzy', () {
+      final woozy = Woozy.escFuzzy();
+      woozy.addEntries(entries);
+      final records = woozy.search('ci');
+      // _inspectResults('ci', records);
+      expect(records[0].text, startsWith('Enim id'));
+      expect(records[1].text, startsWith('Et sunt'));
+      expect(records[2].text, startsWith('Consequat'));
+      expect(records[0].score, closeTo(0.293, 0.001));
+      expect(records[1].score, closeTo(0.048, 0.001));
+      expect(records[2].score, closeTo(0.024, 0.001));
+    });
+  });
+}
+
+// ignore: unused_element
+void _inspectResults(String query, List<MatchResult> results) {
+  var lines = <String>[];
+  lines.add('query: $query');
+  lines.add('results:');
+  results.forEach((element) {
+    lines.add('  - text: ${element.text}');
+    lines.add('    score: ${element.score}');
+  });
+  print(lines.join('\n'));
 }

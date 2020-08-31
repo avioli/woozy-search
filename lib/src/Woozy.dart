@@ -1,28 +1,71 @@
-import 'dart:math';
-
-import 'package:woozy_search/src/Levenshtein.dart';
 import 'package:collection/collection.dart';
 
 import 'Models.dart';
+import 'ScoreProcessors.dart';
 
 /// The main entry point to the library woozy search.
 class Woozy<T> {
-  /// Limit the number of items return from search. Default to 10.
+  /// Constructor to create a `Woozy` object.
+  ///
+  /// If no [processor] is specified, then [defaultProcessor] is used.
+  Woozy({
+    this.limit = 10,
+    this.caseSensitive = false,
+    InputEntryProcessor processor,
+    this.fallbackProcessor,
+  })  : assert(limit > 0, 'limit must be greater than zero'),
+        processor = processor ?? defaultProcessor;
+
+  /// A factory function that uses [ExactScore], [StartsWithScore] and
+  /// [ContainsScore] as word processors
+  factory Woozy.esc({
+    int limit = 10,
+    bool caseSensitive = false,
+    InputEntryProcessor fallbackProcessor,
+  }) {
+    return Woozy(
+      limit: limit,
+      caseSensitive: caseSensitive,
+      processor: FirstWinsProcessor([
+        ExactScore(),
+        StartsWithScore(),
+        ContainsScore(),
+      ]),
+      fallbackProcessor: fallbackProcessor,
+    );
+  }
+
+  /// A factory function that uses the same processor as [esc], but falls back
+  /// to [LevenshteinScore] (with a low weight) if the main processor yeilds a
+  /// score of 0.0
+  factory Woozy.escFuzzy({int limit = 10, bool caseSensitive = false}) {
+    return Woozy.esc(
+      limit: limit,
+      caseSensitive: caseSensitive,
+      fallbackProcessor: SingleScoreProcessor(LevenshteinScore(weight: 0.1)),
+    );
+  }
+
+  /// The default [InputEntry] processor is computing a score, based on the
+  /// Levenshtein distance from the query.
+  static InputEntryProcessor get defaultProcessor =>
+      SingleScoreProcessor(LevenshteinScore(), useWordIndexFalloff: false);
+
+  /// Limit the number of items returned from a search. Defaults to 10.
   final int limit;
 
-  /// Specify whether the string matching is case sensitive or not. Default
+  /// Specify whether the string matching is case sensitive or not. Defaults
   /// to `false`.
   final bool caseSensitive;
 
   /// A list of items to be searched.
   List<InputEntry<T>> _entries = [];
 
-  final Levenshtein _levenshtein = Levenshtein();
+  /// The [InputEntry] processor. Defaults to [defaultProcessor].
+  final InputEntryProcessor processor;
 
-  /// Constructor to create a `Woozy` object.
-  Woozy({this.limit = 10, this.caseSensitive = false}) {
-    assert(limit > 0, 'limit need to be greater than zero');
-  }
+  /// The fallback processor, in case the main returns a score of 0.0.
+  final InputEntryProcessor fallbackProcessor;
 
   /// Add a new entry to the list of items to be searched for.
   ///
@@ -51,29 +94,37 @@ class Woozy<T> {
         texts.map((e) => InputEntry(e, caseSensitive: caseSensitive)).toList();
   }
 
-  /// The main search function.
-  ///
-  /// Given a search query. Return a list of search results.
+  /// Given a search [query], returns a list of search results, sorted by
+  /// highest score.
   List<MatchResult<T>> search(String query) {
-    // Use a heap to keep track of the top `limit` best scores
-    var heapPQ = HeapPriorityQueue<MatchResult<T>>(
-        (lhs, rhs) => lhs.score.compareTo(rhs.score));
+    if (caseSensitive != true) query = query.toLowerCase();
 
-    _entries.forEach((entry) {
-      final bestScore = entry.words.fold(0.0, (currentScore, word) {
-        final score = _levenshtein.score(query, word);
-        return max<double>(currentScore, score);
-      });
+    // Use a heap to keep track of the top `limit` best scores, sorted by score:
+    // lowest first.
+    var heapPQ = HeapPriorityQueue<MatchResult<T>>();
 
-      heapPQ.add(MatchResult(bestScore, text: entry.text, value: entry.value));
+    for (final entry in _entries) {
+      var score = processor.score(query, entry) ?? 0.0;
+
+      if (score == 0.0 && fallbackProcessor != null) {
+        score = fallbackProcessor.score(query, entry) ?? 0.0;
+      }
+
+      // Ensure we don't remove previous entries with the same score,
+      // but keep the first-in
+      if (heapPQ.length == limit && score == heapPQ.first.score) {
+        continue;
+      }
+
+      heapPQ.add(MatchResult(score, text: entry.text, value: entry.value));
 
       if (heapPQ.length > limit) {
         heapPQ.removeFirst();
       }
-    });
+    }
 
-    final result = heapPQ.toList();
-    result.sort((a, b) => b.score.compareTo(a.score));
-    return result;
+    // heapPQ.toList() effectively sorts the list, lowest first, so we want to
+    // reverse it - highest score first.
+    return heapPQ.toList().reversed.toList();
   }
 }

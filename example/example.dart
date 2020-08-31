@@ -33,6 +33,32 @@ void withCaseSensitive() {
   woozySearch(woozy, 'foo');
 }
 
+void withEsc() {
+  final loremIpsumEntries = [
+    'Et sunt sint deserunt ipsum do enim dolore consequat sunt sint adipisicing ipsum.',
+    'Consequat enim id laborum dolor sunt ut.',
+    'Enim id anim veniam elit duis enim id cillum aliqua irure exercitation elit magna.',
+  ];
+
+  var query = 'ci';
+
+  var woozy = Woozy();
+  woozy.setEntries(loremIpsumEntries);
+  print('Standard Levenshtein distance:');
+  woozySearch(woozy, query);
+
+  woozy = Woozy.esc();
+  print('With Exact/StartsWith/Contains processors:');
+  woozy.setEntries(loremIpsumEntries);
+  woozySearch(woozy, query);
+
+  woozy = Woozy.escFuzzy();
+  print(
+      'With Exact/StartsWith/Contains processors, and fallback to Levenshein:');
+  woozy.setEntries(loremIpsumEntries);
+  woozySearch(woozy, query);
+}
+
 void main() {
   basicUsage();
 
@@ -41,4 +67,6 @@ void main() {
   withSearchOutputLimit();
 
   withCaseSensitive();
+
+  withEsc();
 }

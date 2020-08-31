@@ -1,5 +1,7 @@
 import 'package:meta/meta.dart';
 
+// /////////////////////////////////////////////////////////////////////////////
+
 /// Data class for holding a single input searchable item.
 class InputEntry<T> {
   /// The original search [text].
@@ -23,8 +25,10 @@ class InputEntry<T> {
   }
 }
 
+// /////////////////////////////////////////////////////////////////////////////
+
 /// The output search result.
-class MatchResult<T> {
+class MatchResult<T> implements Comparable {
   /// The [score] of the match result represent how goo the match is.
   ///
   /// Minimum is 0 and maximum is 1.
@@ -49,4 +53,27 @@ class MatchResult<T> {
       return textAndScore;
     }
   }
+
+  @override
+  int compareTo(dynamic other) {
+    if (other is! MatchResult) {
+      throw ArgumentError.value(other, 'other', 'must be MatchResult');
+    }
+    return score.compareTo(other.score);
+  }
+}
+
+// /////////////////////////////////////////////////////////////////////////////
+
+/// Abstract class for [InputEntry] processor
+abstract class InputEntryProcessor {
+  double score(String query, InputEntry<dynamic> entry);
+}
+
+// /////////////////////////////////////////////////////////////////////////////
+
+/// Abstract class for [InputEntry] processor's word scoring
+abstract class WordScoreProcessor {
+  double get weight;
+  double score(String query, String word);
 }

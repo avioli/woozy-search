@@ -21,9 +21,24 @@ void main() {
 
     test("Partial match: 'HYUNDAI' vs 'HONDA'", () {
       // H Y U N D A I
-      // H - O N D A -
-      // V X X V V V X
+      // H   O N D A
+      // = - ? = = = -
       expect(levenshtein.distance('HONDA', 'HYUNDAI'), 3);
+      // H O   N D A
+      // H Y U N D A I
+      // = ? + = = = +
+      expect(levenshtein.distance('HYUNDAI', 'HONDA'), 3);
+    });
+
+    test("Partial match: 'INTENTION' vs 'EXECUTION'", () {
+      // I N T E   N T I O N
+      //   E X E C U T I O N
+      // - ? ? = + ? = = = =
+      expect(levenshtein.distance('INTENTION', 'EXECUTION'), 5);
+      //   E X E C U T I O N
+      // I N T E   N T I O N
+      // + ? ? = - ? = = = =
+      expect(levenshtein.distance('INTENTION', 'EXECUTION'), 5);
     });
 
     test("Completely not match: 'Apple' vs 'Banana'", () {
@@ -37,16 +52,6 @@ void main() {
         isNot(throwsRangeError),
       );
       expect(levenshtein.distance('to', 'short'), 4);
-    });
-
-    test('Scoring', () {
-      expect(levenshtein.score('exact', 'exact'), 1);
-      expect(levenshtein.score('', ''), null);
-      expect(levenshtein.score('right-empty', ''), 0);
-      expect(levenshtein.score('', 'left-empty'), 0);
-      expect(levenshtein.score('no', 'match'), 0);
-      expect(levenshtein.score('HONDA', 'HYUNDAI'), closeTo(0.571, 0.001));
-      expect(levenshtein.score('t', 'a-long-string'), closeTo(0.076, 0.001));
     });
   });
 }

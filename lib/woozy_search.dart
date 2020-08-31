@@ -2,4 +2,6 @@
 /// Levenshtein distance.
 library woozy_search;
 
+export 'src/Models.dart';
+export 'src/ScoreProcessors.dart';
 export 'src/Woozy.dart';
